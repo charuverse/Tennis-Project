@@ -1,0 +1,405 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "35394900",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import requests\n",
+    "import json\n",
+    "\n",
+    "url = \"https://api.sportradar.com/tennis/trial/v3/en/competitions.json?api_key=7TOzdGr7SikuNauga42FVUh84HA0ZS1mvb3AaF3j\"\n",
+    "\n",
+    "headers = {\"accept\": \"application/json\"}\n",
+    "\n",
+    "response = requests.get(url, headers=headers)\n",
+    "\n",
+    "print(response.text)\n",
+    "\n",
+    "#convert json file to python dict file\n",
+    "data=json.loads(response.text)\n",
+    "\n",
+    "competitions = data['competitions']\n",
+    "\n",
+    "competitions_list=[]\n",
+    "for comp in competitions:\n",
+    "    competitions_list.append({\n",
+    "        \"id\" : comp[\"id\"],\n",
+    "        \"name\" : comp[\"name\"],\n",
+    "        \"parent_id\": comp.get(\"parent_id\"),\n",
+    "        \"type\" : comp[\"type\"],\n",
+    "        \"gender\" : comp[\"gender\"],\n",
+    "        \"category_id\" : comp[\"category\"][\"id\"]\n",
+    "    })\n",
+    "\n",
+    "category_list=[]\n",
+    "for cate in competitions:\n",
+    "    category_list.append({\n",
+    "        \"category_id\" : cate[\"category\"][\"id\"],\n",
+    "        \"category_name\" : cate[\"category\"][\"name\"]\n",
+    "    })"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6daf9165",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "competition_df=pd.DataFrame(competitions_list)\n",
+    "competition_df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e12d0900",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "category_df=pd.DataFrame(category_list)\n",
+    "category_df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "38156406",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "category_d= category_df.drop_duplicates()\n",
+    "print(category_d)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5b2f5bdc",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "category_d.to_csv(\"category.csv\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "51a196ff",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "competition_d= competition_df.drop_duplicates()\n",
+    "print(competition_d)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "90ef53ab",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "competition_d.to_csv(\"competition.csv\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e0fdc0dd",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import mysql.connector\n",
+    "\n",
+    "mydb = mysql.connector.connect(\n",
+    "    host=\"localhost\",\n",
+    "    user=\"root\",\n",
+    "    password=\"\",\n",
+    "    database=\"tennis_data\"   \n",
+    ")\n",
+    "\n",
+    "mycursor = mydb.cursor(buffered=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6263fe8a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"\"\"\n",
+    "CREATE TABLE Categories ( \n",
+    "    category_id VARCHAR(50) PRIMARY KEY,\n",
+    "    category_name VARCHAR(100) NOT NULL\n",
+    ")\n",
+    "\"\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cf5cc9a5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"\"\"\n",
+    "CREATE TABLE Competitions ( \n",
+    "    competition_id VARCHAR(50) PRIMARY KEY,\n",
+    "    competition_name VARCHAR(100) NOT NULL,\n",
+    "    parent_id VARCHAR(50),\n",
+    "    type VARCHAR(20) NOT NULL,\n",
+    "    gender VARCHAR(10) NOT NULL,\n",
+    "    category_id VARCHAR(50), FOREIGN KEY (category_id) \n",
+    "    REFERENCES Categories(category_id)                                              \n",
+    ")\n",
+    "\"\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e53df06f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from tabulate import tabulate"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "39b65d75",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "categories_query=\"INSERT INTO Categories(category_id,category_name) VALUES (%s, %s)\"\n",
+    "\n",
+    "category_data = [(row['category_id'], row['category_name']) for index, row in category_d.iterrows()]\n",
+    "\n",
+    "mycursor.executemany(categories_query, category_data)\n",
+    "mydb.commit()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1f46dc8f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT * FROM Categories\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "fe3ff116",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT count(*) FROM Categories\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "2a2be016",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "competitions_query=\"INSERT INTO Competitions(competition_id,competition_name,parent_id,type,gender,category_id) VALUES (%s, %s, %s, %s, %s, %s)\"\n",
+    "\n",
+    "competition_data=competition_d[['id','name','parent_id','type','gender','category_id']].values.tolist()\n",
+    "\n",
+    "mycursor.executemany(competitions_query, competition_data)\n",
+    "mydb.commit()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d6391e55",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT * FROM Competitions\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e72b7e45",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT count(*) FROM Competitions\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7386646d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# List all competitions along with their category name\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT Competitions.competition_id,Competitions.competition_name,Categories.category_name \n",
+    "FROM Competitions \n",
+    "JOIN Categories ON Categories.category_id = Competitions.category_id\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "027f59a9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Count the number of competitions in each category\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT Categories.category_name, COUNT(*) AS competition_count\n",
+    "FROM Competitions\n",
+    "JOIN Categories ON Competitions.category_id = Categories.category_id\n",
+    "GROUP BY Categories.category_name\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6786d7b2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Find all competitions of type 'doubles'\n",
+    "\n",
+    "mycursor.execute(\"SELECT competition_id,competition_name,parent_id,type,gender FROM Competitions WHERE type='doubles'\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6f673491",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Get competitions that belong to a specific category (e.g., ITF Men)\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT Competitions.competition_id,Competitions.competition_name,Categories.category_name\n",
+    "FROM Competitions\n",
+    "JOIN Categories ON Competitions.category_id = Categories.category_id\n",
+    "WHERE Categories.category_name = \"ATP\"\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "057bbb43",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Identify parent competitions and their sub-competitions\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT \n",
+    "parent.competition_name AS parent_competition,              \n",
+    "child.competition_name AS sub_competition\n",
+    "FROM Competitions AS child\n",
+    "JOIN Competitions AS parent ON child.parent_id = parent.competition_id \n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "fc5b106b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Analyze the distribution of competition types by category\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT Competitions.type,Categories.category_name,count(*) AS count_of_comptitions\n",
+    "FROM Competitions \n",
+    "JOIN Categories ON Competitions.category_id = Categories.category_id\n",
+    "GROUP BY Categories.category_name, Competitions.type\n",
+    "ORDER BY Categories.category_name, Competitions.type;\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e349796a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# List all competitions with no parent (top-level competitions)\n",
+    "\n",
+    "mycursor.execute(\"SELECT competition_id,competition_name FROM Competitions WHERE parent_iD IS NULL \")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "06e69398",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python (Tennis Analytics)",
+   "language": "python",
+   "name": "tennis_analytics_env"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.13.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

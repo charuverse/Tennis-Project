@@ -1,0 +1,402 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b22a6241",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import requests\n",
+    "import json\n",
+    "\n",
+    "url = \"https://api.sportradar.com/tennis/trial/v3/en/complexes.json?api_key=7TOzdGr7SikuNauga42FVUh84HA0ZS1mvb3AaF3j\"\n",
+    "\n",
+    "headers = {\"accept\": \"application/json\"}\n",
+    "\n",
+    "response = requests.get(url, headers=headers)\n",
+    "\n",
+    "print(response.text)\n",
+    "\n",
+    "data=json.loads(response.text)\n",
+    "\n",
+    "complexes = data['complexes']\n",
+    "\n",
+    "complexe_list=[]\n",
+    "for comp in complexes:\n",
+    "    complexe_list.append({\n",
+    "        \"complex_id\" : comp[\"id\"],\n",
+    "        \"complex_name\" : comp[\"name\"]\n",
+    "    })\n",
+    "\n",
+    "Venue_list=[]\n",
+    "for comp in complexes:\n",
+    "    for ven in comp.get(\"venues\", []):\n",
+    "        Venue_list.append({\n",
+    "            \"id\" : ven[\"id\"],\n",
+    "            \"name\" : ven[\"name\"],\n",
+    "            \"city_name\" : ven[\"city_name\"],\n",
+    "            \"country_name\" : ven[\"country_name\"],\n",
+    "            \"country_code\" : ven[\"country_code\"],\n",
+    "            \"timezone\" : ven[\"timezone\"],\n",
+    "            \"complex_id\" : comp[\"id\"]\n",
+    "        })\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e77f278c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "complexes_df = pd.DataFrame(complexe_list)\n",
+    "complexes_df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "9196a0da",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "venues_df = pd.DataFrame(Venue_list)\n",
+    "venues_df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "eccfb47d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "complexes_d= complexes_df.drop_duplicates()\n",
+    "print(complexes_d)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b0122d59",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "complexes_d.to_csv(\"complexes.csv\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "43fd7700",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "venues_d= venues_df.drop_duplicates()\n",
+    "print(venues_d)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "2332b64d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "venues_d.to_csv(\"venues.csv\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "9a8e62cd",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import mysql.connector\n",
+    "\n",
+    "mydb = mysql.connector.connect(\n",
+    "    host=\"localhost\",\n",
+    "    user=\"root\",\n",
+    "    password=\"\",\n",
+    "    database=\"tennis_data\"   \n",
+    ")\n",
+    "\n",
+    "mycursor = mydb.cursor(buffered=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d297569a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"\"\"\n",
+    "CREATE TABLE complexes (\n",
+    "    complex_id VARCHAR(50) PRIMARY KEY,\n",
+    "    complex_name VARCHAR(100) NOT NULL\n",
+    ")\n",
+    "\"\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a13fd0d1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"\"\" \n",
+    "CREATE TABLE venues (\n",
+    "    venue_id VARCHAR(50) PRIMARY KEY,\n",
+    "    venue_name VARCHAR(100) NOT NULL,\n",
+    "    city_name VARCHAR(100) NOT NULL,\n",
+    "    country_name VARCHAR(100) NOT NULL,\n",
+    "    country_code CHAR(3) NOT NULL,\n",
+    "    timezone VARCHAR(100) NOT NULL,\n",
+    "    complex_id VARCHAR(50), FOREIGN KEY(complex_id)\n",
+    "    REFERENCES complexes(complex_id) \n",
+    ")\n",
+    "\"\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "95134d48",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from tabulate import tabulate"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "51110c12",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "complex_query = \"INSERT INTO complexes(complex_id,complex_name) VALUES (%s, %s)\"\n",
+    "\n",
+    "complex_data = complexes_d[['complex_id','complex_name']].values.tolist()\n",
+    "\n",
+    "mycursor.executemany(complex_query, complex_data)\n",
+    "mydb.commit()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ac08840b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT COUNT(*) FROM complexes\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "937122ac",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT * FROM complexes\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8e128122",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "venues_d.columns"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "48ef906f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "venue_query = \"INSERT INTO venues(venue_id,venue_name,city_name,country_name,country_code,timezone,complex_id) VALUES (%s, %s, %s, %s, %s, %s, %s)\"\n",
+    "\n",
+    "venue_data = venues_d[['id','name','city_name','country_name','country_code','timezone','complex_id']].values.tolist()\n",
+    "\n",
+    "mycursor.executemany(venue_query, venue_data)\n",
+    "mydb.commit()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "bb2aa158",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT COUNT(*) FROM venues\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "9ef443b3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT * FROM venues\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e884876c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# List all venues along with their associated complex name\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT venues.venue_id,venues.venue_name,complexes.complex_name\n",
+    "FROM venues \n",
+    "JOIN complexes ON complexes.complex_id = venues.complex_id\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "540bb0a0",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Count the number of venues in each complex\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT complexes.complex_name,COUNT(*) AS No_of_venues \n",
+    "FROM venues \n",
+    "JOIN complexes ON complexes.complex_id = venues.complex_id\n",
+    "GROUP BY complexes.complex_name\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e87998ea",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Get details of venues in a specific country (e.g., Chile)\n",
+    "\n",
+    "mycursor.execute(\"SELECT venue_id,venue_name,city_name,country_name,country_code,timezone FROM venues WHERE country_name = 'Chile'\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "27c9f6bb",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Identify all venues and their timezones\n",
+    "\n",
+    "mycursor.execute(\"SELECT venue_id,venue_name,timezone FROM venues ORDER BY timezone\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7894c5ff",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Find complexes that have more than one venue\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT complexes.complex_id,complexes.complex_name,COUNT(*) AS No_of_venues \n",
+    "FROM venues \n",
+    "JOIN complexes ON complexes.complex_id = venues.complex_id\n",
+    "GROUP BY complexes.complex_id,complexes.complex_name\n",
+    "HAVING COUNT(*) > 1\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "017b0ea4",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# List venues grouped by country\n",
+    "\n",
+    "mycursor.execute(\"SELECT venue_id,venue_name,country_name FROM venues ORDER BY country_name,venue_name\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "f0e87183",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Find all venues for a specific complex (e.g., Nacional)\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT v.venue_id,v.venue_name,c.complex_name \n",
+    "FROM venues v\n",
+    "JOIN complexes c ON c.complex_id = v.complex_id\n",
+    "WHERE c.complex_name= 'Am Rothenbaum' \"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python (Tennis Analytics)",
+   "language": "python",
+   "name": "tennis_analytics_env"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.13.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

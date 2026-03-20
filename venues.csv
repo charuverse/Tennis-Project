@@ -1,0 +1,403 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1791e06b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import requests\n",
+    "import json\n",
+    "\n",
+    "url = \"https://api.sportradar.com/tennis/trial/v3/en/double_competitors_rankings.json?api_key=7TOzdGr7SikuNauga42FVUh84HA0ZS1mvb3AaF3j\"\n",
+    "\n",
+    "headers = {\"accept\": \"application/json\"}\n",
+    "\n",
+    "response = requests.get(url, headers=headers)\n",
+    "\n",
+    "print(response.text)\n",
+    "\n",
+    "data=json.loads(response.text)\n",
+    "\n",
+    "doublecomrank = data['rankings']\n",
+    "\n",
+    "competitor_ranking_list = []\n",
+    "for dubcomp in doublecomrank:\n",
+    "    for rank in dubcomp.get(\"competitor_rankings\", []):\n",
+    "        comp = rank.get(\"competitor\", [])\n",
+    "        competitor_ranking_list.append({\n",
+    "            \"rank\" : rank[\"rank\"],\n",
+    "            \"movement\" : rank[\"movement\"],\n",
+    "            \"points\" : rank[\"points\"],\n",
+    "            \"competitions_played\" : rank[\"competitions_played\"],\n",
+    "            \"id\" : comp[\"id\"] \n",
+    "        })\n",
+    "\n",
+    "\n",
+    "competitors_list = []\n",
+    "for dubcomp in doublecomrank:\n",
+    "    for rank in dubcomp.get(\"competitor_rankings\", []):\n",
+    "        comp = rank.get(\"competitor\", [])\n",
+    "        competitors_list.append({\n",
+    "            \"id\" : comp[\"id\"],\n",
+    "            \"name\" : comp[\"name\"],\n",
+    "            \"country\" : comp.get(\"country\"),\n",
+    "            \"country_code\" : comp.get(\"country_code\"),\n",
+    "            \"abbreviation\" : comp.get(\"abbreviation\"),\n",
+    "            \"week\" : dubcomp[\"week\"],\n",
+    "            \"Year\" : dubcomp[\"year\"]\n",
+    "        })\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "f9367935",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "competitor_ranking_df = pd.DataFrame(competitor_ranking_list)\n",
+    "competitor_ranking_df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "486bdc87",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "competitors_df = pd.DataFrame(competitors_list)\n",
+    "competitors_df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5011434e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "competitor_ranking_d= competitor_ranking_df.drop_duplicates()\n",
+    "print(competitor_ranking_d)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "2b3879ac",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "competitor_ranking_d.to_csv(\"competitor_ranking.csv\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5a5c7d1f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "competitors_d= competitors_df.drop_duplicates()\n",
+    "print(competitors_d)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "951dad45",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "competitors_d.to_csv(\"competitors.csv\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "025f27e9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import mysql.connector\n",
+    "\n",
+    "mydb = mysql.connector.connect(\n",
+    "    host=\"localhost\",\n",
+    "    user=\"root\",\n",
+    "    password=\"\",\n",
+    "    database=\"tennis_data\"   \n",
+    ")\n",
+    "\n",
+    "mycursor = mydb.cursor(buffered=True) "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1a6d84ef",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"\"\"\n",
+    "CREATE TABLE Competitors (\n",
+    "    competitor_id VARCHAR(50) PRIMARY KEY,\n",
+    "    name VARCHAR(100) NOT NULL,\n",
+    "    country VARCHAR(100) NOT NULL,\n",
+    "    country_code CHAR(3) NOT NULL,\n",
+    "    abbreviation VARCHAR(10) NOT NULL\n",
+    ")\n",
+    "\"\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4303bdeb",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"\"\"\n",
+    "CREATE TABLE Competitor_rankings (\n",
+    "    rank_id INT PRIMARY KEY AUTO_INCREMENT,\n",
+    "    rank INT NOT NULL,\n",
+    "    movement INT NOT NULL,\n",
+    "    points INT NOT NULL,\n",
+    "    competitions_played INT NOT NULL,\n",
+    "    competitor_id VARCHAR(50), FOREIGN KEY(competitor_id)\n",
+    "    REFERENCES Competitors(competitor_id)\n",
+    ")\n",
+    "\"\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "fe26a358",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from tabulate import tabulate"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "83ca014b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "Competitors_query = (\"INSERT INTO Competitors (competitor_id,name,country,country_code,abbreviation,week,year) VALUES(%s, %s,%s, %s, %s, %s, %s)\")\n",
+    "\n",
+    "Competitors_data = competitors_d[['id','name','country','country_code','abbreviation','week','Year']].values.tolist()\n",
+    "\n",
+    "mycursor.executemany(Competitors_query,Competitors_data)\n",
+    "mydb.commit()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ed51c8bc",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT COUNT(*) FROM competitors\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out, headers=[i[0] for i in mycursor.description],  tablefmt='psql'))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "87b6845c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT * FROM competitors\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out,headers=[i[0] for i in mycursor.description], tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d79f9fcb",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "Competitor_rankings_querey = (\"INSERT INTO Competitor_rankings (rank,movement,points,competitions_played,competitor_id) VALUES(%s, %s, %s, %s, %s)\")\n",
+    "\n",
+    "Competitor_rankings_data = competitor_ranking_d[['rank','movement','points','competitions_played','id']].values.tolist()\n",
+    "\n",
+    "mycursor.executemany(Competitor_rankings_querey, Competitor_rankings_data)\n",
+    "mydb.commit()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "79712a4c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT COUNT(*) FROM Competitor_rankings\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out,headers=[i[0] for i in mycursor.description], tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "faa3dea6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mycursor.execute(\"SELECT * FROM Competitor_rankings\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out,headers=[i[0] for i in mycursor.description], tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "49da17ed",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Get all competitors with their rank and points\n",
+    "\n",
+    "mycursor.execute(\"\"\" \n",
+    "SELECT c.competitor_id,c.name,c.country,r.rank,r.points \n",
+    "FROM competitors c\n",
+    "JOIN Competitor_rankings r ON r.competitor_id = c.competitor_id\n",
+    "ORDER BY r.points DESC\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out,headers=[i[0] for i in mycursor.description], tablefmt='psql'))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e29fbc46",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Find competitors ranked in the top 5\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT c.competitor_id,c.name,r.rank\n",
+    "FROM competitors c\n",
+    "JOIN Competitor_rankings r ON r.competitor_id = c.competitor_id\n",
+    "ORDER BY r.rank\n",
+    "LIMIT 5\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out,headers=[i[0] for i in mycursor.description],tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "302539e8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# List competitors with no rank movement (stable rank)\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT c.competitor_id,c.name,c.country,r.movement\n",
+    "FROM competitors c\n",
+    "JOIN Competitor_rankings r ON r.competitor_id = c.competitor_id\n",
+    "WHERE r.movement=0\n",
+    "ORDER BY c.country,c.name\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out,headers=[i[0] for i in mycursor.description], tablefmt='psql'))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ed958f2f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Get the total points of competitors from a specific country (e.g., Croatia)\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT c.country,sum(r.points) AS total_points\n",
+    "FROM Competitor_rankings r\n",
+    "JOIN competitors c ON r.competitor_id = c.competitor_id \n",
+    "WHERE c.country='Italy'\n",
+    "GROUP BY c.country\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out,headers=[i[0] for i in mycursor.description], tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e1470afc",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Count the number of competitors per country\n",
+    "\n",
+    "mycursor.execute(\"\"\"\n",
+    "SELECT country,COUNT(*) AS count_of_competitors_in_country\n",
+    "FROM competitors\n",
+    "GROUP BY country \n",
+    "ORDER BY count_of_competitors_in_country DESC\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out,headers=[i[0] for i in mycursor.description], tablefmt='psql'))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "e4458ede",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Find competitors with the highest points in the current week\n",
+    "mycursor.execute(\"\"\" \n",
+    "SELECT c.name, c.country, r.points\n",
+    "FROM Competitors c\n",
+    "JOIN Competitor_rankings r ON c.competitor_id = r.competitor_id\n",
+    "WHERE c.week = 16 AND c.Year = 2025\n",
+    "ORDER BY r.points DESC\n",
+    "# LIMIT 1;\n",
+    "\"\"\")\n",
+    "out=mycursor.fetchall()\n",
+    "print(tabulate(out,headers=[i[0] for i in mycursor.description], tablefmt='psql'))"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python (Tennis Analytics)",
+   "language": "python",
+   "name": "tennis_analytics_env"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.13.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

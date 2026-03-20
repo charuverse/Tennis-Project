@@ -1,0 +1,9 @@
+[LocalizedFileNames]
+category.csv=@category.csv,0
+competition.csv=@competition.csv,0
+competitor_ranking.csv=@competitor_ranking.csv,0
+competitors.csv=@competitors.csv,0
+venues.csv=@venues.csv,0
+competition_data.ipynb=@competition_data.ipynb,0
+complexes_data.ipynb=@complexes_data.ipynb,0
+doubles_competitor_rankings_data.ipynb=@doubles_competitor_rankings_data.ipynb,0
